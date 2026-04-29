@@ -68,18 +68,22 @@ class Program
                     //Updating 
                     case "3":
                         Console.WriteLine("Enter Person name:");
-                        var name = Console.ReadLine();
+                        var name = Console.ReadLine().Trim();
 
                         Console.WriteLine("Enter New Company name");
                         var newCompany = Console.ReadLine();
 
-                        await using(var session = driver.AsyncSession())
+                        await using (var session = driver.AsyncSession())
                         {
-                            await session.RunAsync($@"
-                                MATCH (p:Person {{name:'{name}'}})
-                                MERGE (c:Company {{name:'{newCompany}'}})
-                                MERGE (p)-[:WORKS_AT]->(c)
-                            ");
+                            await session.RunAsync(@"
+    MATCH (p:Person)
+    WHERE trim(p.name) = $name
+    OPTIONAL MATCH (p)-[r:WORKS_AT]->()
+    DELETE r
+    WITH p
+    MERGE (c:Company {name:$newCompany})
+    MERGE (p)-[:WORKS_AT]->(c)
+", new { name, newCompany });
                         }
                         Console.WriteLine("Updated company record");
                         break;
