@@ -2,20 +2,14 @@
 using System;
 using System.Threading.Tasks;
 
-
 class Program
 {
     static async Task Main()
     {
-       using  var driver = GraphDatabase.Driver(
+        using var driver = GraphDatabase.Driver(
             "neo4j://127.0.0.1:7687",
-            AuthTokens.Basic("neo4j","123456789")
+            AuthTokens.Basic("neo4j", "123456789")
             );
-
-        //var session = driver.AsyncSession();
-
-        //await using var session = driver.AsyncSession(); // this was commented due to failing to reuse same session
-        //moving inside the while loop which gives new session for new operation only when needed
 
         while (true)
         {
@@ -23,31 +17,35 @@ class Program
             {
                 Console.WriteLine("1. Add Person and Company");
                 Console.WriteLine("2. View Data");
-                Console.WriteLine("3. Exit");
+                Console.WriteLine("3. Update Company");
+                Console.WriteLine("4. Delete Person");
+                Console.WriteLine("5. Exit");
+                Console.WriteLine();
+                Console.WriteLine("Choose Option:");
+
 
                 var choice = Console.ReadLine();
 
-                if (choice == "3") break;
+                if (choice == "5") break;
 
                 switch (choice)
                 {
                     case "1":
-                        Console.WriteLine("Enter Person Name");
+                        Console.WriteLine("Enter Person Name:");
                         var person = Console.ReadLine();
 
-                        Console.WriteLine("Enter Company Name");
+                        Console.WriteLine("Enter Company Name:");
                         var company = Console.ReadLine();
 
-                        await using(var session = driver.AsyncSession()) //each loop gets fresh session 
+                       await using(var session = driver.AsyncSession()) //session coming from driver so using it 
                         {
                             await session.RunAsync($@"
-                        MERGE (p:Person {{name:'{person}'}})
-                        MERGE (c:Company {{name:'{company}'}})
-                        MERGE (p)-[:WORKS_AT]->(c)
-                    ",new {person,company});
+                                MERGE (p:Person {{name:'{person}'}})
+                                MERGE (c:Company {{name:'{company}'}})
+                                MERGE (p)-[:WORKS_AT]->(c)
+                            ");
                         }
-
-                        Console.WriteLine("Inserted");
+                        Console.WriteLine("Record inserted");
                         break;
 
                     case "2":
@@ -66,22 +64,46 @@ class Program
                         }
                         break;
 
-                    default:
-                        Console.WriteLine("Invalid Option");
+
+                    //Updating 
+                    case "3":
+                        Console.WriteLine("Enter Person name:");
+                        var name = Console.ReadLine();
+
+                        Console.WriteLine("Enter New Company name");
+                        var newCompany = Console.ReadLine();
+
+                        await using(var session = driver.AsyncSession())
+                        {
+                            await session.RunAsync($@"
+                                MATCH (p:Person {{name:'{name}'}})
+                                MERGE (c:Company {{name:'{newCompany}'}})
+                                MERGE (p)-[:WORKS_AT]->(c)
+                            ");
+                        }
+                        Console.WriteLine("Updated company record");
+                        break;
+
+                    case "4":
+                        Console.WriteLine("Enter name to be deleted");
+                        var delName = Console.ReadLine();
+
+                        await using(var session = driver.AsyncSession())
+                        {
+                            await session.RunAsync($@"
+                                MATCH (p:Person {{name:'{delName}'}})
+                                DETACH DELETE p
+                            ");
+                        }
+
+                        Console.WriteLine("Deleted Record");
                         break;
                 }
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
-                Console.WriteLine("Error: " + ex.Message);
+                Console.WriteLine("Error " + ex.Message);
             }
-            //finally
-            //{
-            //    await session.CloseAsync();
-            //    await driver.DisposeAsync();
-            //}  because used 'using'  which does automatically 
-
-            
         }
     }
 }
