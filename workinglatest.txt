@@ -1,0 +1,103 @@
+using Neo4j.Driver;
+using System;
+using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Main()
+    {
+        var driver = GraphDatabase.Driver(
+            "bolt://127.0.0.1:7687",
+            AuthTokens.Basic("neo4j", "123456789")
+        );
+
+        while (true)
+        {
+            await using var session = driver.AsyncSession(); // ✅ one session per loop
+
+            try
+            {
+                Console.WriteLine("\n1. Add Person and Company");
+                Console.WriteLine("2. View Data");
+                Console.WriteLine("3. Update Company");
+                Console.WriteLine("4. Delete Person");
+                Console.WriteLine("5. Exit");
+                Console.Write("Choose option: ");
+
+                var choice = Console.ReadLine();
+
+                if (choice == "5") break;
+
+                switch (choice)
+                {
+                    case "1":
+                        Console.Write("Enter Person Name: ");
+                        var person = Console.ReadLine();
+
+                        Console.Write("Enter Company Name: ");
+                        var company = Console.ReadLine();
+
+                        await session.RunAsync($@"
+                            MERGE (p:Person {{name:'{person}'}})
+                            MERGE (c:Company {{name:'{company}'}})
+                            MERGE (p)-[:WORKS_AT]->(c)
+                        ");
+
+                        Console.WriteLine("Inserted!");
+                        break;
+
+                    case "2":
+                        var result = await session.RunAsync(@"
+                            MATCH (p:Person)-[:WORKS_AT]->(c:Company)
+                            RETURN p.name AS person, c.name AS company
+                        ");
+
+                        await result.ForEachAsync(record =>
+                        {
+                            Console.WriteLine($"{record["person"]} works at {record["company"]}");
+                        });
+                        break;
+
+                    case "3":
+                        Console.Write("Enter Person Name: ");
+                        var name = Console.ReadLine();
+
+                        Console.Write("Enter New Company: ");
+                        var newCompany = Console.ReadLine();
+
+                        await session.RunAsync($@"
+                            MATCH (p:Person {{name:'{name}'}})
+                            MERGE (c:Company {{name:'{newCompany}'}})
+                            MERGE (p)-[:WORKS_AT]->(c)
+                        ");
+
+                        Console.WriteLine("Updated!");
+                        break;
+
+                    case "4":
+                        Console.Write("Enter Person Name to delete: ");
+                        var delName = Console.ReadLine();
+
+                        await session.RunAsync($@"
+                            MATCH (p:Person {{name:'{delName}'}})
+                            DETACH DELETE p
+                        ");
+
+                        Console.WriteLine("Deleted!");
+                        break;
+
+                    default:
+                        Console.WriteLine("Invalid option");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: " + ex.Message);
+            }
+        }
+
+        // close driver once
+        await driver.DisposeAsync();
+    }
+}

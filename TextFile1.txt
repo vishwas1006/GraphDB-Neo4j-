@@ -1,0 +1,46 @@
+using Neo4j.Driver;
+using System;
+using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Main()
+    {
+        var uri = "neo4j://127.0.0.1:7687";
+        var user = "neo4j";
+        var password = "123456789";
+
+        var driver = GraphDatabase.Driver(uri, AuthTokens.Basic(user, password));
+        var session = driver.AsyncSession();
+
+        try
+        {
+            await session.RunAsync(@"
+            create (p:Person {name:'Ram'})            
+            ");
+
+            await session.RunAsync("Create (c:Company{name:'Google'})");
+
+            var result = await session.RunAsync(@"
+            match (p:Person{name:'Ram'}),(c:Company {name:'Google'})
+            create (p)-[:WORKS_AT]->(c)
+            return p.name as person, c.name as company
+            ");
+
+            await result.ForEachAsync(record =>
+            {
+                Console.WriteLine($"{record["person"]} works at {record["company"]}");
+            });
+
+        }
+        catch(Exception ex)
+{
+            Console.WriteLine("Error: " + ex.Message);
+        }
+        finally
+        {
+                    await session.CloseAsync();
+                    await driver.DisposeAsync();
+                }
+    }
+}
